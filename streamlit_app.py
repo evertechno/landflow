@@ -101,8 +101,8 @@ def streamlit_app():
                 # Handle errors
                 st.session_state.messages.append({"role": "bot", "content": f"Error: {str(e)}"})
 
-            # Refresh the chat window after message is processed
-            st.experimental_rerun()
+            # Instead of rerun, we rely on Streamlit’s state persistence which will refresh automatically
+            st.experimental_rerun()  # Keep this as a temporary placeholder until we confirm the behavior works.
 
 if __name__ == "__main__":
     streamlit_app()
