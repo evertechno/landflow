@@ -1,10 +1,10 @@
-import argparse
 import json
 import requests
 import streamlit as st
 from typing import Optional
 import warnings
 
+# Langflow import for file upload
 try:
     from langflow.load import upload_file
 except ImportError:
@@ -15,8 +15,9 @@ BASE_API_URL = "https://api.langflow.astra.datastax.com"
 LANGFLOW_ID = "edc89198-05a9-4dd1-a754-7c2ccbcc2c55"
 FLOW_ID = "bdb15b27-ac48-4581-9a9c-bb9eb3299e08"
 APPLICATION_TOKEN = "<YOUR_APPLICATION_TOKEN>"
-ENDPOINT = "" # You can set a specific endpoint name in the flow settings
+ENDPOINT = ""  # You can set a specific endpoint name in the flow settings
 
+# Default tweaks (can be modified based on needs)
 TWEAKS = {
     "ChatInput-kwypw": {},
     "ChatOutput-7Nz31": {},
@@ -56,53 +57,52 @@ def run_flow(message: str,
     return response.json()
 
 def streamlit_app():
-    # Streamlit UI elements
-    st.title("Langflow Flow Runner")
-    
-    message = st.text_area("Enter your message:")
-    endpoint = st.text_input("Endpoint", value=FLOW_ID)
-    tweaks_input = st.text_area("Enter tweaks (JSON format):", value=json.dumps(TWEAKS))
-    application_token = st.text_input("Application Token", value=APPLICATION_TOKEN)
-    output_type = st.selectbox("Output Type", options=["chat", "json", "text"], index=0)
-    input_type = st.selectbox("Input Type", options=["chat", "json", "text"], index=0)
+    # Streamlit UI elements for the chat-like interface
+    st.title("Langflow Chatbot")
 
-    # File upload
-    uploaded_file = st.file_uploader("Upload a file (Optional)", type=["txt", "pdf", "docx"])
-    components = st.text_input("Components to upload the file to (Optional)")
+    # Chat history will be stored in session state
+    if 'messages' not in st.session_state:
+        st.session_state.messages = []
 
-    # Button to trigger flow execution
-    if st.button("Run Flow"):
-        try:
-            tweaks = json.loads(tweaks_input)
-        except json.JSONDecodeError:
-            st.error("Invalid tweaks JSON string.")
-            return
+    # Display messages from the conversation
+    for message in st.session_state.messages:
+        if message["role"] == "user":
+            st.markdown(f"**You:** {message['content']}")
+        else:
+            st.markdown(f"**Bot:** {message['content']}")
 
-        if uploaded_file:
-            if not upload_file:
-                raise ImportError("Langflow is not installed. Please install it to use the upload_file function.")
-            if not components:
-                st.error("You need to provide the components to upload the file to.")
-                return
-            # Upload the file
-            tweaks = upload_file(file_path=uploaded_file, host=BASE_API_URL, flow_id=endpoint, components=components, tweaks=tweaks)
+    # Input text for the user message
+    user_message = st.text_input("Type your message here:")
 
-        # Run the flow
-        try:
-            response = run_flow(
-                message=message,
-                endpoint=endpoint,
-                output_type=output_type,
-                input_type=input_type,
-                tweaks=tweaks,
-                application_token=application_token
-            )
+    # Button to trigger the message processing
+    if st.button("Send"):
+        if user_message.strip() != "":
+            # Add user message to session state
+            st.session_state.messages.append({"role": "user", "content": user_message})
 
-            # Display the response in a readable format
-            st.subheader("Response:")
-            st.json(response)
-        except Exception as e:
-            st.error(f"An error occurred: {str(e)}")
+            # Process the user message
+            try:
+                response = run_flow(
+                    message=user_message,
+                    endpoint=FLOW_ID,
+                    output_type="chat",
+                    input_type="chat",
+                    tweaks=TWEAKS,
+                    application_token=APPLICATION_TOKEN
+                )
+
+                # Get the bot's response
+                bot_response = response.get("output_value", "Sorry, I couldn't process your request.")
+
+                # Add bot response to the chat
+                st.session_state.messages.append({"role": "bot", "content": bot_response})
+
+            except Exception as e:
+                # Handle errors
+                st.session_state.messages.append({"role": "bot", "content": f"Error: {str(e)}"})
+
+            # Refresh the chat window after message is processed
+            st.experimental_rerun()
 
 if __name__ == "__main__":
     streamlit_app()
