@@ -1,108 +1,79 @@
-import json
-import requests
 import streamlit as st
-from typing import Optional
-import warnings
+import requests
+import json
+import os
 
-# Langflow import for file upload
-try:
-    from langflow.load import upload_file
-except ImportError:
-    warnings.warn("Langflow provides a function to help you upload files to the flow. Please install langflow to use it.")
-    upload_file = None
-
+# Define Langflow API Details
 BASE_API_URL = "https://api.langflow.astra.datastax.com"
 LANGFLOW_ID = "edc89198-05a9-4dd1-a754-7c2ccbcc2c55"
-FLOW_ID = "bdb15b27-ac48-4581-9a9c-bb9eb3299e08"
-APPLICATION_TOKEN = "<YOUR_APPLICATION_TOKEN>"
-ENDPOINT = ""  # You can set a specific endpoint name in the flow settings
+APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")  # Use an environment variable for security
+FLOW_ID = "bdb15b27-ac48-4581-9a9c-bb9eb3299e08"  # Flow ID (can be changed as needed)
 
-# Default tweaks (can be modified based on needs)
+# Set up your tweaks dictionary (modify as needed)
 TWEAKS = {
-    "ChatInput-kwypw": {},
-    "ChatOutput-7Nz31": {},
-    "ParseData-XdRVt": {},
-    "File-SPYcb": {},
-    "Prompt-GkhTo": {},
-    "GoogleGenerativeAIModel-PXfJR": {}
+  "ChatInput-kwypw": {},
+  "ChatOutput-7Nz31": {},
+  "ParseData-XdRVt": {},
+  "File-SPYcb": {},
+  "Prompt-GkhTo": {},
+  "GoogleGenerativeAIModel-PXfJR": {}
 }
 
-def run_flow(message: str,
-             endpoint: str,
-             output_type: str = "chat",
-             input_type: str = "chat",
-             tweaks: Optional[dict] = None,
-             application_token: Optional[str] = None) -> dict:
+# Function to run the Langflow API call
+def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token: str = None) -> dict:
     """
     Run a flow with a given message and optional tweaks.
 
     :param message: The message to send to the flow
     :param endpoint: The ID or the endpoint name of the flow
     :param tweaks: Optional tweaks to customize the flow
+    :param application_token: Application token for authentication
     :return: The JSON response from the flow
     """
     api_url = f"{BASE_API_URL}/lf/{LANGFLOW_ID}/api/v1/run/{endpoint}"
 
     payload = {
         "input_value": message,
-        "output_type": output_type,
-        "input_type": input_type,
+        "output_type": "chat",  # or change to whatever type you prefer
+        "input_type": "chat",
     }
-    headers = None
+
     if tweaks:
         payload["tweaks"] = tweaks
+
+    headers = None
     if application_token:
         headers = {"Authorization": "Bearer " + application_token, "Content-Type": "application/json"}
+
     response = requests.post(api_url, json=payload, headers=headers)
     return response.json()
 
-def streamlit_app():
-    # Streamlit UI elements for the chat-like interface
+
+# Streamlit Web App Interface
+def main():
     st.title("Langflow Chatbot")
 
-    # Chat history will be stored in session state
-    if 'messages' not in st.session_state:
-        st.session_state.messages = []
+    # Text Input for the User's Message
+    user_message = st.text_input("Ask me anything:")
 
-    # Display messages from the conversation
-    for message in st.session_state.messages:
-        if message["role"] == "user":
-            st.markdown(f"**You:** {message['content']}")
+    if user_message:
+        # Show the user's input message
+        st.write(f"You: {user_message}")
+
+        # Run the Langflow agent with the user's message
+        response = run_flow(
+            message=user_message,
+            endpoint=FLOW_ID,
+            tweaks=TWEAKS,
+            application_token=APPLICATION_TOKEN
+        )
+
+        # Display the response from the Langflow agent
+        if "output_value" in response:
+            st.write(f"Bot: {response['output_value']}")
         else:
-            st.markdown(f"**Bot:** {message['content']}")
+            st.write("Bot: Sorry, I couldn't process your request.")
 
-    # Input text for the user message
-    user_message = st.text_input("Type your message here:")
-
-    # Button to trigger the message processing
-    if st.button("Send"):
-        if user_message.strip() != "":
-            # Add user message to session state
-            st.session_state.messages.append({"role": "user", "content": user_message})
-
-            # Process the user message
-            try:
-                response = run_flow(
-                    message=user_message,
-                    endpoint=FLOW_ID,
-                    output_type="chat",
-                    input_type="chat",
-                    tweaks=TWEAKS,
-                    application_token=APPLICATION_TOKEN
-                )
-
-                # Get the bot's response
-                bot_response = response.get("output_value", "Sorry, I couldn't process your request.")
-
-                # Add bot response to the chat
-                st.session_state.messages.append({"role": "bot", "content": bot_response})
-
-            except Exception as e:
-                # Handle errors
-                st.session_state.messages.append({"role": "bot", "content": f"Error: {str(e)}"})
-
-            # Instead of rerun, we rely on Streamlit’s state persistence which will refresh automatically
-            st.experimental_rerun()  # Keep this as a temporary placeholder until we confirm the behavior works.
-
+# Run the Streamlit app
 if __name__ == "__main__":
-    streamlit_app()
+    main()
