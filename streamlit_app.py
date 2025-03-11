@@ -2,8 +2,12 @@ import streamlit as st
 import requests
 import json
 import os
+from io import StringIO
+from email.parser import BytesParser
+from email.policy import default
+from bs4 import BeautifulSoup
 
-# Define Langflow API Details
+# Langflow API Details
 BASE_API_URL = "https://api.langflow.astra.datastax.com"
 LANGFLOW_ID = "edc89198-05a9-4dd1-a754-7c2ccbcc2c55"
 APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")  # Use an environment variable for security
@@ -21,15 +25,6 @@ TWEAKS = {
 
 # Function to run the Langflow API call
 def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token: str = None) -> dict:
-    """
-    Run a flow with a given message and optional tweaks.
-
-    :param message: The message to send to the flow
-    :param endpoint: The ID or the endpoint name of the flow
-    :param tweaks: Optional tweaks to customize the flow
-    :param application_token: Application token for authentication
-    :return: The JSON response from the flow
-    """
     api_url = f"{BASE_API_URL}/lf/{LANGFLOW_ID}/api/v1/run/{endpoint}"
 
     payload = {
@@ -47,17 +42,74 @@ def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token
 
     response = requests.post(api_url, json=payload, headers=headers)
 
-    # Debug: Print the full response to check its structure
-    print(f"Response from Langflow: {response.json()}")
-
     return response.json()
 
+# Function to handle parsing of plain text email (Marketing)
+def parse_plain_text_email(file):
+    try:
+        content = file.read().decode("utf-8")
+        return content
+    except Exception as e:
+        return {"error": f"Error reading plain text email: {str(e)}"}
+
+# Function to handle parsing of HTML email
+def parse_html_email(file):
+    try:
+        html_content = file.read().decode("utf-8")
+        # Extract text from HTML
+        soup = BeautifulSoup(html_content, "html.parser")
+        body = soup.get_text()
+        return body
+    except Exception as e:
+        return {"error": f"Error reading HTML email: {str(e)}"}
+
+# Function to handle file upload and processing based on upload type
+def handle_file_upload(upload_type):
+    uploaded_file = st.file_uploader(f"Upload a {upload_type} email file", type=["txt", "html"])
+
+    if uploaded_file is not None:
+        if upload_type == "Plain Text Marketing":
+            email_content = parse_plain_text_email(uploaded_file)
+            if "error" in email_content:
+                st.error(email_content["error"])
+            else:
+                st.write("### Email Content")
+                st.write(f"**Content**: {email_content[:500]}...")  # Display first 500 characters of body
+
+                # Perform Marketing email analysis (mockup example)
+                st.write("Analyzing plain text marketing email...")
+                response = run_flow(
+                    message=f"Analyze the following plain text marketing email content:\n\n{email_content}",
+                    endpoint=FLOW_ID,
+                    tweaks=TWEAKS,
+                    application_token=APPLICATION_TOKEN
+                )
+                st.write(f"Marketing Analysis Result: {response.get('output_value', 'No result found')}")
+
+        elif upload_type == "HTML Marketing":
+            email_content = parse_html_email(uploaded_file)
+            if "error" in email_content:
+                st.error(email_content["error"])
+            else:
+                st.write("### Email Content (HTML Extracted)")
+                st.write(f"**Extracted Content**: {email_content[:500]}...")  # Display first 500 characters of extracted body
+
+                # Perform HTML email analysis (mockup example)
+                st.write("Analyzing HTML marketing email...")
+                response = run_flow(
+                    message=f"Analyze the following HTML marketing email content:\n\n{email_content}",
+                    endpoint=FLOW_ID,
+                    tweaks=TWEAKS,
+                    application_token=APPLICATION_TOKEN
+                )
+                st.write(f"HTML Marketing Analysis Result: {response.get('output_value', 'No result found')}")
 
 # Streamlit Web App Interface
 def main():
-    st.title("Langflow Chatbot")
+    st.title("AI Chatbot & Marketing Email Analyzer")
 
-    # Text Input for the User's Message
+    # Chat Section
+    st.header("Chat with the AI Bot")
     user_message = st.text_input("Ask me anything:")
 
     if user_message:
@@ -72,16 +124,19 @@ def main():
             application_token=APPLICATION_TOKEN
         )
 
-        # Debug: Print the response to understand its structure
-        st.write("Full Response from Langflow:")
-        st.json(response)  # Display the raw response in the app for debugging
-
         # Check if 'output_value' exists in the response
         if "output_value" in response:
             st.write(f"Bot: {response['output_value']}")
         else:
             st.write("Bot: Sorry, I couldn't process your request.")
 
-# Run the Streamlit app
+    # File Upload Section
+    st.header("Email Uploads")
+    # Plain Text Marketing Email Upload
+    handle_file_upload("Plain Text Marketing")
+
+    # HTML Marketing Email Upload
+    handle_file_upload("HTML Marketing")
+
 if __name__ == "__main__":
     main()
