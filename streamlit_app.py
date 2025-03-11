@@ -46,6 +46,10 @@ def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token
         headers = {"Authorization": "Bearer " + application_token, "Content-Type": "application/json"}
 
     response = requests.post(api_url, json=payload, headers=headers)
+
+    # Debug: Print the full response to check its structure
+    print(f"Response from Langflow: {response.json()}")
+
     return response.json()
 
 
@@ -68,7 +72,11 @@ def main():
             application_token=APPLICATION_TOKEN
         )
 
-        # Display the response from the Langflow agent
+        # Debug: Print the response to understand its structure
+        st.write("Full Response from Langflow:")
+        st.json(response)  # Display the raw response in the app for debugging
+
+        # Check if 'output_value' exists in the response
         if "output_value" in response:
             st.write(f"Bot: {response['output_value']}")
         else:
