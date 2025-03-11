@@ -2,9 +2,8 @@ import streamlit as st
 import requests
 import json
 import os
-from bs4 import BeautifulSoup
 
-# Langflow API Details
+# Define Langflow API Details
 BASE_API_URL = "https://api.langflow.astra.datastax.com"
 LANGFLOW_ID = "edc89198-05a9-4dd1-a754-7c2ccbcc2c55"
 APPLICATION_TOKEN = os.getenv("APPLICATION_TOKEN")  # Use an environment variable for security
@@ -22,6 +21,15 @@ TWEAKS = {
 
 # Function to run the Langflow API call
 def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token: str = None) -> dict:
+    """
+    Run a flow with a given message and optional tweaks.
+
+    :param message: The message to send to the flow
+    :param endpoint: The ID or the endpoint name of the flow
+    :param tweaks: Optional tweaks to customize the flow
+    :param application_token: Application token for authentication
+    :return: The JSON response from the flow
+    """
     api_url = f"{BASE_API_URL}/lf/{LANGFLOW_ID}/api/v1/run/{endpoint}"
 
     payload = {
@@ -37,72 +45,43 @@ def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token
     if application_token:
         headers = {"Authorization": "Bearer " + application_token, "Content-Type": "application/json"}
 
-    try:
-        response = requests.post(api_url, json=payload, headers=headers)
-        response.raise_for_status()  # Raise an error for bad HTTP responses (4xx or 5xx)
-        return response.json()
-    except requests.exceptions.HTTPError as http_err:
-        st.error(f"HTTP error occurred: {http_err}")
-        return {"error": f"HTTP error occurred: {http_err}"}
-    except Exception as err:
-        st.error(f"An error occurred: {err}")
-        return {"error": f"An error occurred: {err}"}
+    response = requests.post(api_url, json=payload, headers=headers)
 
-# Function to handle parsing of HTML email
-def parse_html_email(file):
-    try:
-        html_content = file.read().decode("utf-8")
-        # Extract text from HTML
-        soup = BeautifulSoup(html_content, "html.parser")
-        body = soup.get_text(separator=" ", strip=True)  # Improved extraction
-        return body
-    except Exception as e:
-        return {"error": f"Error reading HTML email: {str(e)}"}
+    # Debug: Print the full response to check its structure
+    print(f"Response from Langflow: {response.json()}")
 
-# Function to handle file upload and processing based on upload type
-def handle_file_upload(upload_type):
-    uploaded_file = st.file_uploader(f"Upload a {upload_type} email file", type=["txt", "html"])
+    return response.json()
 
-    if uploaded_file is not None:
-        if upload_type == "HTML Marketing":
-            email_content = parse_html_email(uploaded_file)
-            if "error" in email_content:
-                st.error(email_content["error"])
-            else:
-                st.write("### Email Content (HTML Extracted)")
-                st.write(f"**Extracted Content**: {email_content[:500]}...")  # Display first 500 characters of extracted body
-
-                # Perform HTML email analysis (mockup example)
-                st.write("Analyzing HTML marketing email...")
-
-                # Construct message explicitly to ensure proper processing by Langflow
-                langflow_message = f"Analyze the following HTML marketing email content and check if it complies with the advertising code of conduct:\n\n{email_content}"
-
-                response = run_flow(
-                    message=langflow_message,
-                    endpoint=FLOW_ID,
-                    tweaks=TWEAKS,
-                    application_token=APPLICATION_TOKEN
-                )
-
-                # Debugging: Log the response for better visibility
-                st.write("### Full Langflow API Response:")
-                st.json(response)  # Display the full response for debugging
-
-                # Check for 'output_value' in the response
-                if "output_value" in response:
-                    st.write(f"HTML Marketing Analysis Result: {response['output_value']}")
-                else:
-                    st.error(f"Analysis failed. Response: {json.dumps(response)}")
 
 # Streamlit Web App Interface
 def main():
-    st.title("AI Chatbot & Marketing Email Analyzer")
+    st.title("Langflow Chatbot")
 
-    # File Upload Section
-    st.header("Email Uploads")
-    # HTML Marketing Email Upload
-    handle_file_upload("HTML Marketing")
+    # Text Input for the User's Message
+    user_message = st.text_input("Ask me anything:")
 
+    if user_message:
+        # Show the user's input message
+        st.write(f"You: {user_message}")
+
+        # Run the Langflow agent with the user's message
+        response = run_flow(
+            message=user_message,
+            endpoint=FLOW_ID,
+            tweaks=TWEAKS,
+            application_token=APPLICATION_TOKEN
+        )
+
+        # Debug: Print the response to understand its structure
+        st.write("Full Response from Langflow:")
+        st.json(response)  # Display the raw response in the app for debugging
+
+        # Check if 'output_value' exists in the response
+        if "output_value" in response:
+            st.write(f"Bot: {response['output_value']}")
+        else:
+            st.write("Bot: Sorry, I couldn't process your request.")
+
+# Run the Streamlit app
 if __name__ == "__main__":
     main()
