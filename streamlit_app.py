@@ -79,7 +79,7 @@ def handle_file_upload(upload_type):
                 # Perform Marketing email analysis (mockup example)
                 st.write("Analyzing plain text marketing email...")
                 response = run_flow(
-                    message=f"Analyze the following plain text marketing email content:\n\n{email_content}",
+                    message=f"Analyze the following plain text marketing email content and check if complies with marketing code of conduct:\n\n{email_content}",
                     endpoint=FLOW_ID,
                     tweaks=TWEAKS,
                     application_token=APPLICATION_TOKEN
@@ -97,7 +97,7 @@ def handle_file_upload(upload_type):
                 # Perform HTML email analysis (mockup example)
                 st.write("Analyzing HTML marketing email...")
                 response = run_flow(
-                    message=f"Analyze the following HTML marketing email content:\n\n{email_content}",
+                    message=f"Analyze the following HTML marketing email content and check if complies with marketing code of conduct:\n\n{email_content}",
                     endpoint=FLOW_ID,
                     tweaks=TWEAKS,
                     application_token=APPLICATION_TOKEN
