@@ -40,9 +40,16 @@ def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token
     if application_token:
         headers = {"Authorization": "Bearer " + application_token, "Content-Type": "application/json"}
 
-    response = requests.post(api_url, json=payload, headers=headers)
-
-    return response.json()
+    try:
+        response = requests.post(api_url, json=payload, headers=headers)
+        response.raise_for_status()  # Raise an error for bad HTTP responses (4xx or 5xx)
+        return response.json()
+    except requests.exceptions.HTTPError as http_err:
+        st.error(f"HTTP error occurred: {http_err}")
+        return {"error": f"HTTP error occurred: {http_err}"}
+    except Exception as err:
+        st.error(f"An error occurred: {err}")
+        return {"error": f"An error occurred: {err}"}
 
 # Function to handle parsing of plain text email (Marketing)
 def parse_plain_text_email(file):
@@ -58,7 +65,7 @@ def parse_html_email(file):
         html_content = file.read().decode("utf-8")
         # Extract text from HTML
         soup = BeautifulSoup(html_content, "html.parser")
-        body = soup.get_text()
+        body = soup.get_text(separator=" ", strip=True)  # Improved extraction
         return body
     except Exception as e:
         return {"error": f"Error reading HTML email: {str(e)}"}
@@ -79,7 +86,7 @@ def handle_file_upload(upload_type):
                 # Perform Marketing email analysis (mockup example)
                 st.write("Analyzing plain text marketing email...")
                 response = run_flow(
-                    message=f"Analyze the following plain text marketing email content and check if complies with marketing code of conduct:\n\n{email_content}",
+                    message=f"Analyze the following plain text marketing email content:\n\n{email_content}",
                     endpoint=FLOW_ID,
                     tweaks=TWEAKS,
                     application_token=APPLICATION_TOKEN
@@ -97,12 +104,17 @@ def handle_file_upload(upload_type):
                 # Perform HTML email analysis (mockup example)
                 st.write("Analyzing HTML marketing email...")
                 response = run_flow(
-                    message=f"Analyze the following HTML marketing email content and check if complies with marketing code of conduct:\n\n{email_content}",
+                    message=f"Analyze the following HTML marketing email content:\n\n{email_content}",
                     endpoint=FLOW_ID,
                     tweaks=TWEAKS,
                     application_token=APPLICATION_TOKEN
                 )
-                st.write(f"HTML Marketing Analysis Result: {response.get('output_value', 'No result found')}")
+
+                # Check if the response contains expected output
+                if "output_value" in response:
+                    st.write(f"HTML Marketing Analysis Result: {response['output_value']}")
+                else:
+                    st.error(f"Analysis failed. Response: {response}")
 
 # Streamlit Web App Interface
 def main():
