@@ -1,3 +1,4 @@
+
 import streamlit as st
 import requests
 import json
@@ -56,18 +57,13 @@ def run_flow(message: str, endpoint: str, tweaks: dict = None, application_token
 # Streamlit Web App Interface
 def main():
     st.title("Langflow Chatbot")
-    st.subheader("Ask me anything and I'll try to assist you.")
-
-    # Chat history management in the session state
-    if 'chat_history' not in st.session_state:
-        st.session_state.chat_history = []
 
     # Text Input for the User's Message
-    user_message = st.text_input("Your message:")
+    user_message = st.text_input("Ask me anything:")
 
     if user_message:
         # Show the user's input message
-        st.session_state.chat_history.append({"role": "user", "message": user_message})
+        st.write(f"You: {user_message}")
 
         # Run the Langflow agent with the user's message
         response = run_flow(
@@ -78,18 +74,14 @@ def main():
         )
 
         # Debug: Print the response to understand its structure
-        print("Response from Langflow:", response)
+        st.write("Full Response from Langflow:")
+        st.json(response)  # Display the raw response in the app for debugging
 
-        # Extract bot's response and add it to the chat history
-        bot_message = response.get('output_value', "Sorry, I couldn't process your request.")
-        st.session_state.chat_history.append({"role": "bot", "message": bot_message})
-
-    # Display chat history
-    for chat in st.session_state.chat_history:
-        if chat['role'] == 'user':
-            st.markdown(f"**You:** {chat['message']}")
+        # Check if 'output_value' exists in the response
+        if "output_value" in response:
+            st.write(f"Bot: {response['output_value']}")
         else:
-            st.markdown(f"**Bot:** {chat['message']}")
+            st.write("Bot: Sorry, I couldn't process your request.")
 
 # Run the Streamlit app
 if __name__ == "__main__":
